@@ -120,6 +120,71 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _clearAllHistory() async {
+    final passwordController = TextEditingController();
+    bool _obscure = true;
+    
+    final isPasswordCorrect = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.lock, color: Color(0xFFD32F2F)),
+                  SizedBox(width: 8),
+                  Text('Password Hapus'),
+                ],
+              ),
+              content: TextField(
+                controller: passwordController,
+                obscureText: _obscure,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  labelText: 'Masukkan Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setStateDialog(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('BATAL', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (passwordController.text == '122333') {
+                      Navigator.pop(context, true);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password salah!'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD32F2F),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('LANJUT'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (isPasswordCorrect != true) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
