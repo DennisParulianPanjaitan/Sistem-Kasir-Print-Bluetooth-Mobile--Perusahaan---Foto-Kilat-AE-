@@ -446,9 +446,31 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              row['receiptNumber'] as String,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  row['receiptNumber'] as String,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                ),
+                                                if (((row['downPayment'] as num?)?.toDouble() ?? 0) > 0) ...[
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.blueAccent.withValues(alpha: 0.15),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: const Text(
+                                                      'DP',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.blueAccent,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                             const SizedBox(height: 2),
                                             Row(
@@ -476,7 +498,20 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                                               fontSize: 14,
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
+                                          if (((row['downPayment'] as num?)?.toDouble() ?? 0) > 0) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _isOmsetHidden
+                                                  ? 'DP: ***'
+                                                  : 'DP: ${CurrencyFormatter.formatRupiah(((row['downPayment'] as num?)?.toDouble() ?? 0))}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.blueAccent,
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(height: 6),
                                           InkWell(
                                             onTap: () => _deleteHistory(row),
                                             borderRadius: BorderRadius.circular(4),

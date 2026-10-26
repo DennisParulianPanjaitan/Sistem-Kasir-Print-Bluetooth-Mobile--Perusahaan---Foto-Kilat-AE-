@@ -57,6 +57,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       items: items,
       total: (widget.historyRow['total'] as num).toDouble(),
       discountPercent: (widget.historyRow['discountPercent'] as num?)?.toDouble() ?? 0.0,
+      downPayment: (widget.historyRow['downPayment'] as num?)?.toDouble() ?? 0.0,
     );
 
     final header = await DatabaseService.instance.getSetting('header', 'FOTO KILAT AE');

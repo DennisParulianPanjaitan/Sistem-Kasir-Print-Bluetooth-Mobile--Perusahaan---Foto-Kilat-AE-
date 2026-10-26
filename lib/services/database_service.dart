@@ -22,7 +22,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -51,6 +51,10 @@ class DatabaseService {
       await db.execute('ALTER TABLE print_history ADD COLUMN shift_index INTEGER DEFAULT 1');
       await db.execute('ALTER TABLE print_history ADD COLUMN logical_date TEXT');
       await db.execute("UPDATE print_history SET logical_date = substr(date, 1, 10) WHERE logical_date IS NULL");
+    }
+    if (oldVersion < 5) {
+      // Menambahkan kolom downPayment untuk transaksi DP
+      await db.execute('ALTER TABLE print_history ADD COLUMN downPayment REAL DEFAULT 0');
     }
   }
 
@@ -84,7 +88,8 @@ class DatabaseService {
         discountAmount REAL DEFAULT 0,
         subtotalBeforeDiscount REAL DEFAULT 0,
         shift_index INTEGER DEFAULT 1,
-        logical_date TEXT NOT NULL
+        logical_date TEXT NOT NULL,
+        downPayment REAL DEFAULT 0
       )
     ''');
     
@@ -284,6 +289,7 @@ class DatabaseService {
       'subtotalBeforeDiscount': receipt.subtotalBeforeDiscount,
       'shift_index': shiftInfo['shift_index'],
       'logical_date': shiftInfo['logical_date'],
+      'downPayment': receipt.downPayment,
     });
 
     // Update last receipt number
@@ -300,7 +306,8 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getDailyOmsetSummary() async {
     final db = await instance.database;
     final result = await db.rawQuery('''
-      SELECT logical_date, SUM(total) as daily_omset 
+      SELECT logical_date, 
+             SUM(CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as daily_omset 
       FROM print_history 
       GROUP BY logical_date 
       ORDER BY logical_date DESC
@@ -322,13 +329,15 @@ class DatabaseService {
   // Mengambil total omset dipecah per shift untuk tanggal tertentu
   Future<List<Map<String, dynamic>>> getShiftOmsetByDate(String logicalDate) async {
     final db = await instance.database;
-    return await db.rawQuery('''
-      SELECT shift_index, SUM(total) as shift_omset 
+    final result = await db.rawQuery('''
+      SELECT shift_index, 
+             SUM(CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as shift_omset 
       FROM print_history 
       WHERE logical_date = ?
       GROUP BY shift_index 
       ORDER BY shift_index ASC
     ''', [logicalDate]);
+    return result;
   }
 
   Future<void> deleteHistory(int id) async {

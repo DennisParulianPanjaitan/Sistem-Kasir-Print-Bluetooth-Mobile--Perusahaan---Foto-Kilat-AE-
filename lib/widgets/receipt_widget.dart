@@ -162,6 +162,36 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ],
           ),
+          if (receipt.hasDp) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'DP',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                Text(
+                  CurrencyFormatter.formatRupiah(receipt.downPayment),
+                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'SISA',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                Text(
+                  CurrencyFormatter.formatRupiah(receipt.remainingPayment),
+                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
 
           // 7. Footer

@@ -238,6 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _cart.removeAt(existingItemIndex);
         }
       }
+      if (_downPayment > _cartFinalTotal) {
+        _downPayment = _cartFinalTotal;
+      }
     });
   }
 
@@ -253,6 +256,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _cart.add(ReceiptItem(product: product, quantity: quantity));
         }
       }
+      if (_downPayment > _cartFinalTotal) {
+        _downPayment = _cartFinalTotal;
+      }
     });
   }
 
@@ -260,10 +266,12 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _cart.clear();
       _discountPercent = 0;
+      _downPayment = 0;
     });
   }
 
   double _discountPercent = 0;
+  double _downPayment = 0;
 
   double get _cartTotal {
     return _cart.fold(0, (sum, item) => sum + item.subtotal);
@@ -271,6 +279,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   double get _cartFinalTotal {
     return _cartTotal - (_cartTotal * _discountPercent / 100);
+  }
+
+  double get _cartRemainingPayment {
+    final rem = _cartFinalTotal - _downPayment;
+    return rem > 0 ? rem : 0;
   }
 
   void _showDiscountDialog() {
@@ -324,6 +337,90 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showDpDialog() {
+    final controller = TextEditingController(
+      text: _downPayment > 0 ? _downPayment.toStringAsFixed(0) : '',
+    );
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Input Uang Muka (DP)'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total Tagihan: ${CurrencyFormatter.formatRupiah(_cartFinalTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Nominal DP (Rp)',
+                    prefixText: 'Rp ',
+                    border: const OutlineInputBorder(),
+                    errorText: errorText,
+                  ),
+                  onChanged: (val) {
+                    final amount = double.tryParse(val) ?? 0;
+                    if (amount > _cartFinalTotal) {
+                      setStateDialog(() => errorText = 'DP tidak boleh melebihi total!');
+                    } else if (errorText != null) {
+                      setStateDialog(() => errorText = null);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (_downPayment > 0)
+              TextButton(
+                onPressed: () {
+                  setState(() => _downPayment = 0);
+                  Navigator.pop(context);
+                },
+                child: const Text('HAPUS DP', style: TextStyle(color: Colors.redAccent)),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('BATAL', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final val = double.tryParse(controller.text) ?? 0;
+                if (val <= 0) {
+                  setState(() => _downPayment = 0);
+                  Navigator.pop(context);
+                  return;
+                }
+                if (val > _cartFinalTotal) {
+                  setStateDialog(() => errorText = 'DP tidak boleh melebihi total!');
+                  return;
+                }
+                setState(() => _downPayment = val);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFCC0000),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('TERAPKAN'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handlePreview() async {
     final receiptNumber = await DatabaseService.instance.generateNextReceiptNumber();
     
@@ -333,6 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
       items: List.from(_cart),
       total: _cartFinalTotal,
       discountPercent: _discountPercent,
+      downPayment: _downPayment,
     );
 
     if (mounted) {
@@ -354,6 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
       items: List.from(_cart),
       total: _cartFinalTotal,
       discountPercent: _discountPercent,
+      downPayment: _downPayment,
     );
 
     if (mounted) {
@@ -735,12 +834,12 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   _discountPercent > 0 ? 'SUBTOTAL:' : 'TOTAL:',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   CurrencyFormatter.formatRupiah(_cartTotal),
                   style: TextStyle(
-                    fontSize: _discountPercent > 0 ? 18 : 24,
+                    fontSize: _discountPercent > 0 ? 17 : 22,
                     fontWeight: FontWeight.bold,
                     color: _discountPercent > 0 ? Colors.grey : const Color(0xFFCC0000),
                     decoration: _discountPercent > 0 ? TextDecoration.lineThrough : null,
@@ -756,11 +855,46 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Diskon ${_discountPercent.toStringAsFixed(0)}%:',
-                    style: const TextStyle(fontSize: 16, color: Colors.redAccent),
+                    style: const TextStyle(fontSize: 15, color: Colors.redAccent),
                   ),
                   Text(
                     '- ${CurrencyFormatter.formatRupiah(_cartTotal * _discountPercent / 100)}',
-                    style: const TextStyle(fontSize: 16, color: Colors.redAccent),
+                    style: const TextStyle(fontSize: 15, color: Colors.redAccent),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _downPayment > 0 ? 'TOTAL AKHIR:' : 'BAYAR:',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    CurrencyFormatter.formatRupiah(_cartFinalTotal),
+                    style: TextStyle(
+                      fontSize: _downPayment > 0 ? 18 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFCC0000),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            // Baris DP & Sisa Bayar (hanya tampil jika ada DP)
+            if (_downPayment > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'UANG MUKA (DP):',
+                    style: TextStyle(fontSize: 15, color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    CurrencyFormatter.formatRupiah(_downPayment),
+                    style: const TextStyle(fontSize: 15, color: Colors.blueAccent, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -769,13 +903,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'BAYAR:',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    'SISA BAYAR:',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    CurrencyFormatter.formatRupiah(_cartFinalTotal),
+                    CurrencyFormatter.formatRupiah(_cartRemainingPayment),
                     style: const TextStyle(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFCC0000),
                     ),
@@ -786,43 +920,24 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 12),
             Column(
               children: [
-                // Baris 1: CLEAR + PREVIEW
+                // Baris 1: CLEAR + % DISKON + DP
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _cart.isEmpty ? null : _clearCart,
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text('CLEAR'),
+                        child: const Text('CLEAR', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: _cart.isEmpty ? null : _handlePreview,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.blueGrey,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('PREVIEW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Baris 2: DISKON % + PRINT CEPAT (dominan)
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
                       child: OutlinedButton(
                         onPressed: _cart.isEmpty ? null : _showDiscountDialog,
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           side: BorderSide(
                             color: _discountPercent > 0 ? Colors.orange : const Color(0xFFCC0000),
                           ),
@@ -832,17 +947,52 @@ class _HomeScreenState extends State<HomeScreen> {
                           _discountPercent > 0
                               ? '${_discountPercent.toStringAsFixed(0)}% ✓'
                               : '% Diskon',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 3,
+                      child: OutlinedButton(
+                        onPressed: _cart.isEmpty ? null : _showDpDialog,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(
+                            color: _downPayment > 0 ? Colors.blueAccent : const Color(0xFFCC0000),
+                          ),
+                          foregroundColor: _downPayment > 0 ? Colors.blueAccent : const Color(0xFFCC0000),
+                        ),
+                        child: Text(
+                          _downPayment > 0 ? 'DP ✓' : '+ DP',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Baris 2: PREVIEW + PRINT CEPAT
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: ElevatedButton(
+                        onPressed: _cart.isEmpty ? null : _handlePreview,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.blueGrey,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('PREVIEW', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
                       child: ElevatedButton.icon(
                         onPressed: _cart.isEmpty ? null : _handleQuickPrint,
                         icon: const Icon(Icons.print),
-                        label: const Text('PRINT CEPAT', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        label: const Text('PRINT CEPAT', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: const Color(0xFFCC0000),
@@ -875,12 +1025,12 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 _discountPercent > 0 ? 'SUBTOTAL:' : 'TOTAL:',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Text(
                 CurrencyFormatter.formatRupiah(_cartTotal),
                 style: TextStyle(
-                  fontSize: _discountPercent > 0 ? 18 : 24,
+                  fontSize: _discountPercent > 0 ? 17 : 22,
                   fontWeight: FontWeight.bold,
                   color: _discountPercent > 0 ? Colors.grey : const Color(0xFFCC0000),
                   decoration: _discountPercent > 0 ? TextDecoration.lineThrough : null,
@@ -896,11 +1046,46 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   'Diskon ${_discountPercent.toStringAsFixed(0)}%:',
-                  style: const TextStyle(fontSize: 16, color: Colors.redAccent),
+                  style: const TextStyle(fontSize: 15, color: Colors.redAccent),
                 ),
                 Text(
                   '- ${CurrencyFormatter.formatRupiah(_cartTotal * _discountPercent / 100)}',
-                  style: const TextStyle(fontSize: 16, color: Colors.redAccent),
+                  style: const TextStyle(fontSize: 15, color: Colors.redAccent),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _downPayment > 0 ? 'TOTAL AKHIR:' : 'BAYAR:',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  CurrencyFormatter.formatRupiah(_cartFinalTotal),
+                  style: TextStyle(
+                    fontSize: _downPayment > 0 ? 18 : 22,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFCC0000),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          // Baris DP & Sisa Bayar (hanya tampil jika ada DP)
+          if (_downPayment > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'UANG MUKA (DP):',
+                  style: TextStyle(fontSize: 15, color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  CurrencyFormatter.formatRupiah(_downPayment),
+                  style: const TextStyle(fontSize: 15, color: Colors.blueAccent, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -909,13 +1094,13 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'BAYAR:',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  'SISA BAYAR:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  CurrencyFormatter.formatRupiah(_cartFinalTotal),
+                  CurrencyFormatter.formatRupiah(_cartRemainingPayment),
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFFCC0000),
                   ),
@@ -926,43 +1111,24 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 12),
           Column(
             children: [
-              // Baris 1: CLEAR + PREVIEW
+              // Baris 1: CLEAR + % DISKON + DP
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _cart.isEmpty ? null : _clearCart,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text('CLEAR'),
+                      child: const Text('CLEAR', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _cart.isEmpty ? null : _handlePreview,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.blueGrey,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('PREVIEW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Baris 2: DISKON % + PRINT CEPAT (dominan)
-              Row(
-                children: [
-                  Expanded(
-                    flex: 1,
                     child: OutlinedButton(
                       onPressed: _cart.isEmpty ? null : _showDiscountDialog,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(
                           color: _discountPercent > 0 ? Colors.orange : const Color(0xFFCC0000),
                         ),
@@ -972,17 +1138,52 @@ class _HomeScreenState extends State<HomeScreen> {
                         _discountPercent > 0
                             ? '${_discountPercent.toStringAsFixed(0)}% ✓'
                             : '% Diskon',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    flex: 3,
+                    child: OutlinedButton(
+                      onPressed: _cart.isEmpty ? null : _showDpDialog,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(
+                          color: _downPayment > 0 ? Colors.blueAccent : const Color(0xFFCC0000),
+                        ),
+                        foregroundColor: _downPayment > 0 ? Colors.blueAccent : const Color(0xFFCC0000),
+                      ),
+                      child: Text(
+                        _downPayment > 0 ? 'DP ✓' : '+ DP',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Baris 2: PREVIEW + PRINT CEPAT
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: ElevatedButton(
+                      onPressed: _cart.isEmpty ? null : _handlePreview,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.blueGrey,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('PREVIEW', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
                     child: ElevatedButton.icon(
                       onPressed: _cart.isEmpty ? null : _handleQuickPrint,
                       icon: const Icon(Icons.print),
-                      label: const Text('PRINT CEPAT', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      label: const Text('PRINT CEPAT', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: const Color(0xFFCC0000),
