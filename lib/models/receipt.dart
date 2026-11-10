@@ -8,6 +8,9 @@ class Receipt {
   final double total;
   final double discountPercent;
   final double downPayment;
+  final bool isSettled;
+  final String? settledDate;
+  final String? customerPhone;
 
   Receipt({
     required this.receiptNumber,
@@ -16,6 +19,9 @@ class Receipt {
     required this.total,
     this.discountPercent = 0,
     this.downPayment = 0,
+    this.isSettled = false,
+    this.settledDate,
+    this.customerPhone,
   });
 
   double get subtotalBeforeDiscount => items.fold(0, (sum, item) => sum + item.subtotal);

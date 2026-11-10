@@ -70,6 +70,22 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ],
           ),
+          if (receipt.customerPhone != null && receipt.customerPhone!.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'NO. HP',
+                  style: TextStyle(fontSize: 18, color: Colors.black),
+                ),
+                Text(
+                  receipt.customerPhone!.trim(),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
 
           // 3. Garis Putus-putus
@@ -178,19 +194,49 @@ class ReceiptWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'SISA',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-                Text(
-                  CurrencyFormatter.formatRupiah(receipt.remainingPayment),
-                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-              ],
-            ),
+            if (receipt.isSettled) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'PELUNASAN',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  Text(
+                    CurrencyFormatter.formatRupiah(receipt.remainingPayment),
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'STATUS',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  Text(
+                    'LUNAS',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'SISA',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  Text(
+                    CurrencyFormatter.formatRupiah(receipt.remainingPayment),
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ],
+              ),
+            ],
           ],
           const SizedBox(height: 16),
 

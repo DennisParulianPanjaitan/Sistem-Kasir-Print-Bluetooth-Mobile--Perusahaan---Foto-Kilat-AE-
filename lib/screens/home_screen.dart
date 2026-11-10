@@ -9,6 +9,7 @@ import 'preview_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 import 'printer_screen.dart';
+import 'unpaid_receipts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -267,11 +268,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _cart.clear();
       _discountPercent = 0;
       _downPayment = 0;
+      _customerPhone = null;
     });
   }
 
   double _discountPercent = 0;
   double _downPayment = 0;
+  String? _customerPhone;
 
   double get _cartTotal {
     return _cart.fold(0, (sum, item) => sum + item.subtotal);
@@ -341,6 +344,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final controller = TextEditingController(
       text: _downPayment > 0 ? _downPayment.toStringAsFixed(0) : '',
     );
+    final phoneController = TextEditingController(
+      text: _customerPhone ?? '',
+    );
     String? errorText;
 
     showDialog(
@@ -378,6 +384,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   },
                 ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'No. HP Pelanggan (Opsional)',
+                    hintText: 'Contoh: 08123456789',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(),
+                    helperText: 'Boleh dikosongkan jika tidak ada',
+                  ),
+                ),
               ],
             ),
           ),
@@ -385,7 +403,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_downPayment > 0)
               TextButton(
                 onPressed: () {
-                  setState(() => _downPayment = 0);
+                  setState(() {
+                    _downPayment = 0;
+                    _customerPhone = null;
+                  });
                   Navigator.pop(context);
                 },
                 child: const Text('HAPUS DP', style: TextStyle(color: Colors.redAccent)),
@@ -398,7 +419,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 final val = double.tryParse(controller.text) ?? 0;
                 if (val <= 0) {
-                  setState(() => _downPayment = 0);
+                  setState(() {
+                    _downPayment = 0;
+                    _customerPhone = null;
+                  });
                   Navigator.pop(context);
                   return;
                 }
@@ -406,7 +430,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   setStateDialog(() => errorText = 'DP tidak boleh melebihi total!');
                   return;
                 }
-                setState(() => _downPayment = val);
+                final phone = phoneController.text.trim();
+                setState(() {
+                  _downPayment = val;
+                  _customerPhone = phone.isNotEmpty ? phone : null;
+                });
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
@@ -431,6 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
       total: _cartFinalTotal,
       discountPercent: _discountPercent,
       downPayment: _downPayment,
+      customerPhone: _customerPhone,
     );
 
     if (mounted) {
@@ -453,6 +482,7 @@ class _HomeScreenState extends State<HomeScreen> {
       total: _cartFinalTotal,
       discountPercent: _discountPercent,
       downPayment: _downPayment,
+      customerPhone: _customerPhone,
     );
 
     if (mounted) {
@@ -492,6 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 maxLength: 6,
                 decoration: InputDecoration(
                   labelText: 'Masukkan Password',
+                  counterText: '',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
@@ -898,6 +929,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+              if (_customerPhone != null && _customerPhone!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'NO. HP PELANGGAN:',
+                      style: TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      _customerPhone!,
+                      style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1089,6 +1136,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+            if (_customerPhone != null && _customerPhone!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'NO. HP PELANGGAN:',
+                    style: TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    _customerPhone!,
+                    style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1235,6 +1298,42 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           const Divider(),
+          // MENU BELUM LUNAS
+          FutureBuilder<int>(
+            future: DatabaseService.instance.getUnpaidCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return ListTile(
+                leading: const Icon(Icons.pending_actions_rounded, color: Colors.orange),
+                title: const Text('Belum Lunas'),
+                trailing: count > 0
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : null,
+                onTap: () async {
+                  Navigator.pop(context);
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const UnpaidReceiptsScreen()),
+                  );
+                  setState(() {});
+                },
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.history),
             title: const Text('Riwayat Penjualan'),

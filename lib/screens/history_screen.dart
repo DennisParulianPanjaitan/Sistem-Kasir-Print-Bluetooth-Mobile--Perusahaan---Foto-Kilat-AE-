@@ -142,9 +142,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 controller: passwordController,
                 obscureText: _obscure,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 8,
                 decoration: InputDecoration(
                   labelText: 'Masukkan Password',
+                  counterText: '',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
@@ -159,7 +160,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (passwordController.text == '122333') {
+                    if (passwordController.text == '12345678') {
                       Navigator.pop(context, true);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(

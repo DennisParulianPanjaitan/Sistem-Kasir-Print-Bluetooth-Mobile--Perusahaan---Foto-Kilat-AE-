@@ -22,7 +22,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -55,6 +55,17 @@ class DatabaseService {
     if (oldVersion < 5) {
       // Menambahkan kolom downPayment untuk transaksi DP
       await db.execute('ALTER TABLE print_history ADD COLUMN downPayment REAL DEFAULT 0');
+    }
+    if (oldVersion < 6) {
+      // Menambahkan kolom status pelunasan dan tracking waktu pelunasan
+      await db.execute('ALTER TABLE print_history ADD COLUMN is_settled INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE print_history ADD COLUMN settled_date TEXT');
+      await db.execute('ALTER TABLE print_history ADD COLUMN settled_logical_date TEXT');
+      await db.execute('ALTER TABLE print_history ADD COLUMN settled_shift_index INTEGER');
+    }
+    if (oldVersion < 7) {
+      // Menambahkan kolom no HP pelanggan (opsional)
+      await db.execute('ALTER TABLE print_history ADD COLUMN customer_phone TEXT');
     }
   }
 
@@ -89,7 +100,12 @@ class DatabaseService {
         subtotalBeforeDiscount REAL DEFAULT 0,
         shift_index INTEGER DEFAULT 1,
         logical_date TEXT NOT NULL,
-        downPayment REAL DEFAULT 0
+        downPayment REAL DEFAULT 0,
+        is_settled INTEGER DEFAULT 0,
+        settled_date TEXT,
+        settled_logical_date TEXT,
+        settled_shift_index INTEGER,
+        customer_phone TEXT
       )
     ''');
     
@@ -290,6 +306,8 @@ class DatabaseService {
       'shift_index': shiftInfo['shift_index'],
       'logical_date': shiftInfo['logical_date'],
       'downPayment': receipt.downPayment,
+      'is_settled': receipt.downPayment > 0 ? 0 : 1,
+      'customer_phone': receipt.customerPhone,
     });
 
     // Update last receipt number
@@ -306,11 +324,19 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getDailyOmsetSummary() async {
     final db = await instance.database;
     final result = await db.rawQuery('''
-      SELECT logical_date, 
-             SUM(CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as daily_omset 
-      FROM print_history 
-      GROUP BY logical_date 
-      ORDER BY logical_date DESC
+      SELECT the_date as logical_date, SUM(amount) as daily_omset 
+      FROM (
+        SELECT logical_date as the_date, 
+               (CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as amount 
+        FROM print_history
+        UNION ALL
+        SELECT settled_logical_date as the_date, 
+               (total - downPayment) as amount 
+        FROM print_history 
+        WHERE is_settled = 1 AND downPayment > 0 AND settled_logical_date IS NOT NULL
+      ) 
+      GROUP BY the_date 
+      ORDER BY the_date DESC
     ''');
     return result;
   }
@@ -330,14 +356,62 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getShiftOmsetByDate(String logicalDate) async {
     final db = await instance.database;
     final result = await db.rawQuery('''
-      SELECT shift_index, 
-             SUM(CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as shift_omset 
-      FROM print_history 
-      WHERE logical_date = ?
-      GROUP BY shift_index 
-      ORDER BY shift_index ASC
-    ''', [logicalDate]);
+      SELECT the_shift as shift_index, SUM(amount) as shift_omset 
+      FROM (
+        SELECT shift_index as the_shift, 
+               (CASE WHEN downPayment > 0 THEN downPayment ELSE total END) as amount 
+        FROM print_history 
+        WHERE logical_date = ?
+        UNION ALL
+        SELECT settled_shift_index as the_shift, 
+               (total - downPayment) as amount 
+        FROM print_history 
+        WHERE is_settled = 1 AND downPayment > 0 AND settled_logical_date = ?
+      ) 
+      GROUP BY the_shift 
+      ORDER BY the_shift ASC
+    ''', [logicalDate, logicalDate]);
     return result;
+  }
+
+  // Mengambil semua nota yang belum lunas (ada DP dan belum dilunasi)
+  Future<List<Map<String, dynamic>>> getUnpaidReceipts() async {
+    final db = await instance.database;
+    return await db.query(
+      'print_history',
+      where: 'downPayment > 0 AND (is_settled IS NULL OR is_settled = 0)',
+      orderBy: 'id DESC',
+    );
+  }
+
+  // Menghitung jumlah nota yang belum lunas
+  Future<int> getUnpaidCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count 
+      FROM print_history 
+      WHERE downPayment > 0 AND (is_settled IS NULL OR is_settled = 0)
+    ''');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // Melunasi nota DP
+  Future<void> settleReceipt(int id) async {
+    final db = await instance.database;
+    final now = DateTime.now();
+    final shiftInfo = await getCurrentShiftInfo(now);
+
+    await db.update(
+      'print_history',
+      {
+        'is_settled': 1,
+        'settled_date': now.toIso8601String(),
+        'settled_logical_date': shiftInfo['logical_date'],
+        'settled_shift_index': shiftInfo['shift_index'],
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteHistory(int id) async {

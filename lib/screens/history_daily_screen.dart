@@ -54,7 +54,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
 
   Future<void> _deleteHistory(Map<String, dynamic> row) async {
     final passwordController = TextEditingController();
-    bool _obscure = true;
+    bool obscure = true;
     
     final isPasswordCorrect = await showDialog<bool>(
       context: context,
@@ -73,15 +73,16 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
               ),
               content: TextField(
                 controller: passwordController,
-                obscureText: _obscure,
+                obscureText: obscure,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 8,
                 decoration: InputDecoration(
                   labelText: 'Masukkan Password',
+                  counterText: '',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setStateDialog(() => _obscure = !_obscure),
+                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setStateDialog(() => obscure = !obscure),
                   ),
                 ),
               ),
@@ -92,7 +93,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (passwordController.text == '122333') {
+                    if (passwordController.text == '12345678') {
                       Navigator.pop(context, true);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +119,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
 
     if (isPasswordCorrect != true) return;
 
+    if (!mounted) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -149,7 +151,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
 
   Future<void> _clearAllDataForDay() async {
     final passwordController = TextEditingController();
-    bool _obscure = true;
+    bool obscure = true;
     
     final isPasswordCorrect = await showDialog<bool>(
       context: context,
@@ -168,15 +170,16 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
               ),
               content: TextField(
                 controller: passwordController,
-                obscureText: _obscure,
+                obscureText: obscure,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 8,
                 decoration: InputDecoration(
                   labelText: 'Masukkan Password',
+                  counterText: '',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setStateDialog(() => _obscure = !_obscure),
+                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setStateDialog(() => obscure = !obscure),
                   ),
                 ),
               ),
@@ -187,7 +190,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (passwordController.text == '122333') {
+                    if (passwordController.text == '12345678') {
                       Navigator.pop(context, true);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,6 +216,7 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
 
     if (isPasswordCorrect != true) return;
 
+    if (!mounted) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -402,6 +406,8 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                             final date = DateTime.parse(row['date'] as String);
                             final formattedTime = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
                             final shiftIndex = row['shift_index'] ?? 1;
+                            final downPayment = (row['downPayment'] as num?)?.toDouble() ?? 0.0;
+                            final isSettled = row['is_settled'] == 1;
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -452,20 +458,22 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                                                   row['receiptNumber'] as String,
                                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                                 ),
-                                                if (((row['downPayment'] as num?)?.toDouble() ?? 0) > 0) ...[
+                                                if (downPayment > 0) ...[
                                                   const SizedBox(width: 6),
                                                   Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                     decoration: BoxDecoration(
-                                                      color: Colors.blueAccent.withValues(alpha: 0.15),
+                                                      color: isSettled
+                                                          ? Colors.green.withValues(alpha: 0.15)
+                                                          : Colors.orange.withValues(alpha: 0.15),
                                                       borderRadius: BorderRadius.circular(4),
                                                     ),
-                                                    child: const Text(
-                                                      'DP',
+                                                    child: Text(
+                                                      isSettled ? 'DP LUNAS' : 'DP',
                                                       style: TextStyle(
                                                         fontSize: 10,
                                                         fontWeight: FontWeight.bold,
-                                                        color: Colors.blueAccent,
+                                                        color: isSettled ? Colors.green[700] : Colors.orange,
                                                       ),
                                                     ),
                                                   ),
@@ -498,16 +506,18 @@ class _HistoryDailyScreenState extends State<HistoryDailyScreen> {
                                               fontSize: 14,
                                             ),
                                           ),
-                                          if (((row['downPayment'] as num?)?.toDouble() ?? 0) > 0) ...[
+                                          if (downPayment > 0) ...[
                                             const SizedBox(height: 2),
                                             Text(
                                               _isOmsetHidden
-                                                  ? 'DP: ***'
-                                                  : 'DP: ${CurrencyFormatter.formatRupiah(((row['downPayment'] as num?)?.toDouble() ?? 0))}',
-                                              style: const TextStyle(
+                                                  ? (isSettled ? 'DP: *** (LUNAS)' : 'DP: ***')
+                                                  : (isSettled
+                                                      ? 'DP: ${CurrencyFormatter.formatRupiah(downPayment)} (LUNAS)'
+                                                      : 'DP: ${CurrencyFormatter.formatRupiah(downPayment)}'),
+                                              style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.blueAccent,
+                                                color: isSettled ? Colors.green[700] : Colors.blueAccent,
                                               ),
                                             ),
                                           ],
